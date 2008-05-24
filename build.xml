@@ -1,0 +1,372 @@
+<?xml version="1.0"?>
+
+<project name="Hozom Server" default="package" basedir="." xmlns:ivy="antlib:org.apache.ivy.ant">
+    <!-- =================================
+        property: initial dirs
+    ================================= -->
+    <property file="${basedir}/settings/build.properties" />
+
+    <!-- =================================
+        property: ivy setting
+    ================================= -->
+    <property file="${basedir}/settings/ivy/ivysettings.properties"/>
+    <property name="ivy.settings.file" value="${basedir}/settings/ivy/ivysettings.xml"/>
+
+    <!-- here is the version of ivy we will use. change this property to try a newer
+         version if you want -->
+    <property name="ivy.install.version" value="2.0.0-beta2" />
+    <property name="ivy.jar.dir" value="${user.home}/.ant/lib" />
+    <property name="ivy.jar.file" value="${ivy.jar.dir}/ivy.jar" />
+
+    <property name="build.dir" value="build" />
+    <property name="src.dir" value="src" />
+    <!-- =================================
+        property: emma classpath setting
+    ================================= -->
+    <path id="emma.lib">
+        <pathelement location="${file.lib.emma}" />
+        <pathelement location="${file.lib.emma_ant}" />
+    </path>
+
+    <!-- =================================
+        classpath: compile
+    ================================= -->
+    <path id="compile.classpath">
+        <fileset dir="${dir.ivy.compilelib}">
+            <include name="*.jar"/>
+        </fileset>
+    </path>
+
+    <!-- =================================
+        classpath: test compile
+    ================================= -->
+    <path id="test.classpath">
+        <pathelement location="${dir.web.classes}" />
+        <path refid="compile.classpath"/>
+    </path>
+
+    <!-- =================================
+        classpath: test run
+    ================================= -->
+    <path id="test.run.classpath">
+        <pathelement location="${dir.test}/res" />
+        <pathelement location="${dir.emma.classes}" />
+        <pathelement location="${dir.test.classes}" />
+        <pathelement location="${dir.web.classes}" />
+        <path refid="compile.classpath"/>
+        <pathelement location="${dir.res}" />
+    </path>
+
+    <!-- Ant Targets Start  -->
+
+    <target name="download-ivy" unless="skip.download">
+        <mkdir dir="${ivy.jar.dir}"/>
+        <!-- download Ivy from web site so that it can be used even without any special installation -->
+        <echo message="installing ivy..."/>
+        <get src="http://repo1.maven.org/maven2/org/apache/ivy/ivy/${ivy.install.version}/ivy-${ivy.install.version}.jar"
+                 dest="${ivy.jar.file}" usetimestamp="true" ignoreerrors="true"/>
+    </target>
+
+    <!-- =================================
+          target: install-ivy
+            this target is not necessary if you put ivy.jar in your ant lib directory
+            if you already have ivy in your ant lib, you can simply remove this
+            target and the dependency the 'go' target has on it
+         ================================= -->
+    <target name="install-ivy" depends="download-ivy" description="--> install ivy">
+        <!-- try to load ivy here from local ivy dir, in case the user has not already dropped
+              it into ant's lib dir (note that the latter copy will always take precedence).
+              We will not fail as long as local lib dir exists (it may be empty) and
+              ivy is in at least one of ant's lib dir or the local lib dir. -->
+        <path id="ivy.lib.path">
+            <fileset dir="${ivy.jar.dir}" includes="*.jar"/>
+        </path>
+        <taskdef resource="org/apache/ivy/ant/antlib.xml"
+                uri="antlib:org.apache.ivy.ant" classpathref="ivy.lib.path"/>
+        <!-- check if necessary to retrieve jars by ivy -->
+        <available file="${dir.ivy.compilelib}" type="dir" property="ivy.compilelib.present"/>
+    </target>
+
+    <target name="checkstyle" depends="compile-src"
+            description="--&gt; Generates a report of code convention violations.">
+        
+    <taskdef resource="checkstyletask.properties" classpathref="compile.classpath" />
+
+    <checkstyle config="${file.checkstyle.conf}"
+            failureProperty="checkstyle.failure"
+            failOnViolation="false">
+        <classpath>
+                <path refid="test.classpath"/>
+        </classpath>
+        <formatter type="xml" tofile="${dir.checkstyle.report.xml}/checkstyle_report.xml"/>
+        <fileset dir="${dir.src}">
+            <include name="**/*.java" />
+        </fileset>
+        </checkstyle>
+
+    <xslt basedir="${dir.checkstyle.report.xml}" destdir="${dir.checkstyle.report.html}" style="${file.checkstyle.report.xslt}"/>
+
+    <delete file="${dir.checkstyle.report.html}/checkstyle_report.html" />
+    </target>
+
+    <!-- =================================
+        target: init
+    ================================= -->
+    <target name="init" description="--&gt; create dir">
+        <mkdir dir="${dir.web.classes}"/>
+        <mkdir dir="${dir.ivy.lib}"/>
+        <mkdir dir="${dir.web.lib}"/>
+        <mkdir dir="${dir.output}"/>
+        <mkdir dir="${dir.test.classes}"/>
+        <mkdir dir="${dir.javadoc.api}"/>
+        <mkdir dir="${dir.junit.report}" />
+        <mkdir dir="${dir.junit.report.result}" />
+        <mkdir dir="${dir.checkstyle.report}" />
+        <mkdir dir="${dir.checkstyle.report.xml}" />
+        <mkdir dir="${dir.checkstyle.report.html}" />
+        <mkdir dir="${dir.war}" />
+    </target>
+
+    <!-- Target for resolving dependencies  -->
+    <target name="ivy-resolve" depends="install-ivy" unless="ivy.compilelib.present">
+    <ivy:resolve file="${basedir}/settings/ivy/ivy.xml" conf="${ivy.configurations}"/>
+    </target>
+
+    <!-- =================================
+        target: ivy-retrieve
+    ================================= -->
+    <target name="ivy-retrieve" depends="init, ivy-resolve" description="--&gt; retreive dependencies with ivy" unless="ivy.compilelib.present">
+        <mkdir dir="${dir.ivy.compilelib}"/>
+        <ivy:retrieve pattern="${dir.ivy.lib}/[conf]/[artifact]-[revision].[ext]" />
+    </target>
+
+    <!-- =================================
+        target: clean-cache
+    ================================= -->
+    <target name="clean-cache" depends="install-ivy" description="--&gt; clean the ivy cache">
+        <ivy:cleancache/>
+    </target>
+
+    <!-- =================================
+        target: clean
+    ================================= -->
+    <target name="clean" description="--&gt; clean the project">
+        <delete dir="${dir.web.classes}"/>
+        <delete dir="${dir.ivy.compilelib}"/>
+        <delete dir="${dir.ivy.lib}"/>
+        <delete dir="${dir.web.lib}"/>
+        <delete dir="${dir.output}"/>
+    </target>
+
+    <!-- =================================
+        target: compile-src
+    ================================= -->
+    <target name="compile-src" depends="init, ivy-retrieve" description="--&gt; compile the source">
+        <javac srcdir="${dir.src.java}" destdir="${dir.web.classes}" debug="true" encoding="utf-8">
+            <classpath refid="compile.classpath"/>
+            <include name="**/*.java"/>
+        </javac>
+    </target>
+
+    <!-- =================================
+        target: package
+    ================================= -->
+    <target name="package" depends="init, compile-src" description="--&gt; package to webapp">
+        <copy todir="${dir.web.classes}" overwrite="yes">
+            <fileset dir="${dir.src.java}" includes="**/*.xml **/*.properties" />
+        </copy>
+
+        <copy todir="${dir.web.lib}" overwrite="no">
+        <fileset dir="${dir.ivy.compilelib}">
+            <include name="**/**"/>
+            <exclude name="**/jsp-api*" />
+            <exclude name="**/*servlet*" />
+        </fileset>
+        </copy>
+
+        <copy todir="${dir.web.classes}" overwrite="yes">
+            <fileset dir="${dir.res}" includes="**" />
+        </copy>
+    </target>
+
+    <!-- =================================
+        target: dist
+    ================================= -->
+    <target name="dist" depends="package" description="--&gt; build war">
+        <war destfile="${file.war}" webxml="${dir.web.inf}/web.xml">
+            <fileset dir="${dir.web}"/>
+        </war>
+    </target>
+
+    <!-- =================================
+        target: compile-test
+    ================================= -->
+    <target name="compile-test" depends="init, compile-src" description="--&gt; compile test classes">
+        <javac srcdir="${dir.test.src}" destdir="${dir.test.classes}" encoding="utf-8">
+            <classpath refid="test.classpath"/>
+            <include name="**/*.java"/>
+        </javac>
+    </target>
+
+    <!-- ==================================
+           target: create-test-db
+    ================================= -->
+    <target name="create-test-db" description="--&gt; creates the test database">
+        <property file="${dir.test.res}/database.properties" />
+        <antcall target="create-db" />
+    </target>
+    
+    <!-- ==================================
+               target: create-test-db
+    ================================= -->
+    <target name="create-dev-db" description="--&gt; creates the development database">
+        <property file="${dir.res}/database.properties" />
+        <antcall target="create-db" />
+    </target>
+
+    <!-- ==================================
+           target: create-db
+    ================================= -->
+    <target name="create-db">
+        <!-- fail if any of the required JDBC properties are not specified: -->
+        <fail unless="database.username" message="database username not set"/>
+        <fail unless="database.password" message="database password not set"/>
+        <fail unless="jdbc.driver" message="database driver not set"/>
+        <fail unless="jdbc.url" message="database url not set"/>
+        <fail unless="database.databasename" message="database name not set"/>
+
+        <!-- echo all the properties -->
+        <echo message="creating database..." />
+        <echo message="jdbc driver      : ${jdbc.driver}" />
+        <echo message="jdbc url         : ${jdbc.url}" />
+        <echo message="database name    : ${database.databasename}" />
+        <echo message="database username: ${database.username}" />
+        <echo message="database password: ${database.password}" />
+
+        <sql driver="${jdbc.driver}"
+             url="${jdbc.url}/postgres"
+             userid="${database.username}"
+             password="${database.password}"
+             autocommit="true"
+             onerror="continue"
+             src="${basedir}/database/dbcreate.sql">
+            <classpath>
+                <path refid="compile.classpath"/>
+            </classpath>
+        </sql>
+
+        <sql driver="${jdbc.driver}"
+             url="${jdbc.url}/${database.databasename}"
+             userid="${database.username}"
+             onerror="continue"
+             password="${database.password}">
+            <classpath>
+                <path refid="compile.classpath"/>
+            </classpath>
+            <transaction src="${basedir}/database/dbschema.sql" />
+        </sql>
+    </target>
+    
+    <!-- =================================
+        target: test
+    ================================= -->
+    <target name="test" depends="clean, run-test" description="--&gt; clean and run-test" />
+
+    <!-- =================================
+        target: run-test
+    ================================= -->
+    <target name="run-test" depends="compile-test, create-test-db" description="--&gt; run tests, and generate emma report">
+        <taskdef resource="emma_ant.properties" classpathref="emma.lib"/>
+        <echo message="EMMA enabled: ${emma.enabled}"/>
+        <mkdir dir="${dir.emma}"/>
+        <mkdir dir="${dir.emma.classes}"/>
+
+        <copy todir="${dir.emma.classes}" overwrite="no">
+            <fileset dir="${dir.src.java}" includes="**/*.xml" />
+        </copy>
+        <copy todir="${dir.test.classes}" overwrite="no">
+            <fileset dir="${dir.test.src}" includes="**/*.xml" />
+        </copy>
+        <copy todir="${dir.test.classes}" overwrite="no">
+            <fileset dir="${dir.test.res}" includes="**/*" />
+        </copy>
+        <emma enabled="${emma.enabled}">
+            <instr destdir="${dir.emma.classes}"
+                   metadatafile="${dir.emma}/metadata.emma"
+                   merge="true">
+                <filter file="${emma.filter.file}"/>
+                <instrpath>
+                    <pathelement location="${dir.web.classes}"/>
+                </instrpath>
+            </instr>
+        </emma>
+
+        <junit printsummary="yes" fork="yes" failureproperty="test.fail">
+            <classpath>
+                <path refid="test.run.classpath" />
+                <path refid="emma.lib" />
+            </classpath>
+
+            <formatter type="plain"/>
+            <formatter type="xml"/>
+
+            <batchtest todir="${dir.junit.report.result}" if="testcase">
+                <fileset dir="${dir.test.classes}">
+                    <include name="**/*${testcase}*"/>
+                    <exclude name="**/*Test.class"/>
+                </fileset>
+            </batchtest>
+
+            <batchtest fork="yes" todir="${dir.junit.report.result}" unless="testcase">
+                <fileset dir="${dir.test.classes}">
+                    <include name="**/*Test.class"/>
+                </fileset>
+            </batchtest>
+
+            <!-- tell EMMA runtime where to drop coverage data: -->
+            <jvmarg value="-Demma.coverage.out.file=${dir.emma}/coverage.emma"/>
+            <jvmarg value="-Demma.coverage.out.merge=true" />
+        </junit>
+
+        <junitreport todir="${dir.junit.report}">
+            <fileset dir="${dir.junit.report.result}">
+                <include name="*" />
+            </fileset>
+            <report format="frames" todir="${dir.junit.report}"/>
+        </junitreport>
+
+        <!-- generate EMMA coverage report: -->
+        <emma enabled="${emma.enabled}">
+            <report sourcepath="${dir.src.java}">
+                <!-- collect all EMMA data dumps (metadata and runtime): -->
+                <fileset dir="${dir.emma}">
+                    <include name="*.emma"/>
+                </fileset>
+                <html outfile="${dir.emma}/coverage.html"/>
+                <xml outfile="${dir.emma}/coverage.xml"/>
+            </report>
+        </emma>
+        
+        <!-- fail this build if at lease one test fails -->
+        <fail message="Fail to run test. Please check the junit reports." if="test.fail" />
+    </target>
+
+    <!-- =================================
+        target: generate javadoc 
+    ================================= -->
+    <target name="javadoc" depends="init" description="--&gt; generate javadoc">
+      <javadoc packagenames="com.hozom.*"
+        sourcepath="${dir.src.java}"
+        destdir="${dir.javadoc.api}"
+        classpath="${compile.classpath}"
+        version="true"
+        use="true"
+        public="true"
+        encoding="utf-8"
+        locale="en_US"
+        windowtitle="API Documentation">
+        <doctitle><![CDATA[<h1>API Documentation</h1>]]></doctitle>
+      </javadoc>
+    </target>
+        
+</project>

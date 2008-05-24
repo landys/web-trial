@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns="http://java.sun.com/xml/ns/javaee"
+	xmlns:web="http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
+	xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
+	id="WebApp_ID" version="2.5">
+	<display-name>hozom</display-name>
+	<servlet>
+		<servlet-name>hozomTrialServlet</servlet-name>
+		<servlet-class>
+			com.hozom.server.web.HozomTrialServlet
+		</servlet-class>
+		
+		<init-param>
+			<param-name>indexPage</param-name>
+			<param-value>/page/seal.jsp</param-value>
+		</init-param>
+		
+		<init-param>
+			<param-name>defaultPage</param-name>
+			<param-value>/page/seal.jsp</param-value>
+		</init-param>
+
+		<init-param>
+			<param-name>applyCommand</param-name>
+			<param-value>com.hozom.server.web.action.ApplyCommand</param-value>
+		</init-param>
+		
+		<init-param>
+			<param-name>trialCommand</param-name>
+			<param-value>com.hozom.server.web.action.TrialCommand</param-value>
+		</init-param>
+	</servlet>
+
+	<servlet-mapping>
+		<servlet-name>hozomTrialServlet</servlet-name>
+		<url-pattern>*.html</url-pattern>
+	</servlet-mapping>
+	<servlet-mapping>
+		<servlet-name>hozomTrialServlet</servlet-name>
+		<url-pattern>*.rmt</url-pattern>
+	</servlet-mapping>
+	<welcome-file-list>
+		<welcome-file>index.jsp</welcome-file>
+	</welcome-file-list>
+</web-app>
